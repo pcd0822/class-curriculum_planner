@@ -149,28 +149,28 @@
         <div class="max-w-5xl mx-auto bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-lg border border-slate-200">
             <div class="space-y-4">
                  <div class="flex flex-col sm:flex-row gap-4 items-center flex-wrap">
-                      <button id="googleSheetBtn" class="btn btn-primary w-full sm:w-auto" style="background-image: linear-gradient(to right, #34d399, #10b981);">자료 입력(Google Sheet)</button>
-                      <label for="fileUpload" class="btn btn-primary w-full sm:w-auto">
-                          엑셀 파일 업로드
-                      </label>
-                      <input type="file" id="fileUpload" class="hidden" accept=".xlsx, .xls, .csv">
-                      <button id="resetBtn" class="btn btn-danger w-full sm:w-auto">데이터 초기화</button>
-                      <p id="fileName" class="text-sm text-slate-500 flex-grow text-center sm:text-left">업로드된 파일이 없습니다.</p>
+                     <button id="googleSheetBtn" class="btn btn-primary w-full sm:w-auto" style="background-image: linear-gradient(to right, #34d399, #10b981);">자료 입력(Google Sheet)</button>
+                     <label for="fileUpload" class="btn btn-primary w-full sm:w-auto">
+                         엑셀 파일 업로드
+                     </label>
+                     <input type="file" id="fileUpload" class="hidden" accept=".xlsx, .xls, .csv">
+                     <button id="resetBtn" class="btn btn-danger w-full sm:w-auto">데이터 초기화</button>
+                     <p id="fileName" class="text-sm text-slate-500 flex-grow text-center sm:text-left">업로드된 파일이 없습니다.</p>
                  </div>
                  <hr>
                  <div class="flex flex-col sm:flex-row gap-4 items-center">
-                      <div class="flex-grow w-full sm:w-auto">
-                          <label for="classCodeInput" class="block text-sm font-medium text-slate-600 mb-1">학급 정보 입력</label>
-                          <input type="text" id="classCodeInput" placeholder="예: 101" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition">
-                      </div>
-                      <div class="flex gap-4 self-end">
-                           <button id="analyzeBtn" class="btn btn-primary">분석하기</button>
-                      </div>
+                     <div class="flex-grow w-full sm:w-auto">
+                         <label for="classCodeInput" class="block text-sm font-medium text-slate-600 mb-1">학급 정보 입력</label>
+                         <input type="text" id="classCodeInput" placeholder="예: 101" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition">
+                     </div>
+                     <div class="flex gap-4 self-end">
+                         <button id="analyzeBtn" class="btn btn-primary">분석하기</button>
+                     </div>
                  </div>
             </div>
              <div id="loading" class="hidden flex justify-center items-center mt-8 gap-2">
-                  <div class="loader"></div>
-                  <span id="loadingText" class="text-slate-500">데이터를 분석하고 있습니다...</span>
+                 <div class="loader"></div>
+                 <span id="loadingText" class="text-slate-500">데이터를 분석하고 있습니다...</span>
              </div>
         </div>
 
@@ -296,7 +296,7 @@
                 {"subjectName": "물질과 에너지", "slug": "muljilgwa-eneoji", "grade": "2", "semester": "2"},
                 {"subjectName": "세포와 물질대사", "slug": "sepowa-muljildaesa", "grade": "2", "semester": "2"},
                 {"subjectName": "지구시스템과학", "slug": "jigusiseutemgwahag", "grade": "2", "semester": "2"},
-                {"subjectName": "음악 감상과 비평", "slug": "eumakgamsanggwabipyeong", "grade": "2", "semester": "2"},
+                {"subjectName": "음악 연주와 창작", "slug": "eumakyeonjuwachangjak", "grade": "2", "semester": "2"},
                 {"subjectName": "정보", "slug": "jeongbo", "grade": "2", "semester": "2"},
                 {"subjectName": "인간과 심리", "slug": "ingangwa-simri", "grade": "2", "semester": "2"},
                 {"subjectName": "화법과 언어", "slug": "hwabeopgwaeoneo", "grade": "3", "semester": "1"},
@@ -394,7 +394,7 @@
                 'muljilgwa-eneoji': { credits: 4, category: '탐구교과', subCategory: '과학', required: false, offered: true, prerequisites: ['hwahag'] },
                 'sepowa-muljildaesa': { credits: 4, category: '탐구교과', subCategory: '과학', required: false, offered: true, prerequisites: ['saengmyeonggwahag'] },
                 'jigusiseutemgwahag': { credits: 4, category: '탐구교과', subCategory: '과학', required: false, offered: true, prerequisites: ['jigugwahag'] },
-                'eumakgamsanggwabipyeong': { credits: 4, category: '예술교과', subCategory: '예술', required: false, offered: true },
+                'eumakyeonjuwachangjak': { credits: 4, category: '예술교과', subCategory: '예술', required: false, offered: true },
                 'jeongbo': { credits: 4, category: '생활교양교과', subCategory: '제2외국어/정보/교양', required: false, offered: true },
                 'ingangwa-simri': { credits: 4, category: '생활교양교과', subCategory: '제2외국어/정보/교양', required: false, offered: true },
                 'hwabeopgwaeoneo': { credits: 4, category: '기초교과', subCategory: '국어', required: false, offered: true },
@@ -1130,6 +1130,12 @@
                 window.open(GOOGLE_SHEET_EDIT_URL, '_blank');
             });
             closeAiModalBtn.addEventListener('click', () => aiModal.classList.remove('active'));
+            aiModal.addEventListener('click', (e) => {
+                if (e.target === aiModal) {
+                    aiModal.classList.remove('active');
+                }
+            });
+
 
             // --- 핵심 로직 ---
             function initializeApp() {
@@ -1223,7 +1229,7 @@
                     
                     // Run all rendering tasks, including the async AI analysis
                     const [aiAnalysisHTML, validationHTML] = await Promise.all([
-                        renderAiAnalysis(classStudents),
+                        renderInitialAiAnalysis(classStudents),
                         renderValidationStatus(classStudents) // This is synchronous but can be in Promise.all
                     ]);
 
@@ -1266,6 +1272,9 @@
                     renderSubjectComparisonChart(classStudents, classCode, true);
                     renderInquiryRatioChart(classStudents, true);
                     renderLanguageChart(classStudents, true);
+                    
+                    // Add event listener for the detailed AI analysis button
+                    document.getElementById('detailedAiBtn').addEventListener('click', () => handleDetailedAiAnalysis(classStudents));
 
                     dashboardDiv.classList.remove('hidden');
                 } catch (err) {
@@ -1835,8 +1844,7 @@
                 `;
             }
 
-            async function renderAiAnalysis(classStudents) {
-                // The main loading indicator is active while this function runs.
+            async function renderInitialAiAnalysis(classStudents) {
                 try {
                     const classDataString = JSON.stringify(classStudents.map(s => ({
                         name: s['이름'],
@@ -1844,7 +1852,52 @@
                         subjects: getStudentCourses(s).map(c => c.subjectName)
                     })));
 
-                    // Define the 4 separate analysis prompts
+                    const prompt = `당신은 대한민국 고등학교의 진로진학 전문 컨설턴트입니다. 주어진 학급 학생 데이터 ${classDataString} 를 바탕으로, 담임 선생님을 위한 학급의 전반적인 과목 선택 경향과 주요 특징을 한 문단으로 간결하게 요약해주세요.`;
+                    
+                    const summary = await callOpenAiApiViaProxy(prompt);
+                    const formattedSummary = summary.replace(/\n/g, '<br>');
+
+                    return `<h3 class="card-title">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                AI 종합 분석 요약
+                            </h3>
+                            <div class="text-sm text-slate-600 space-y-2">${formattedSummary}</div>
+                            <div class="mt-4 flex justify-end">
+                                <button id="detailedAiBtn" class="btn btn-secondary">자세히 보기</button>
+                            </div>`;
+                } catch (error) {
+                    console.error("Initial AI Analysis Error:", error);
+                    return `<h3 class="card-title">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                AI 분석 오류
+                            </h3>
+                            <p class="text-red-500">AI 분석 요약을 가져오는 데 실패했습니다. 잠시 후 다시 시도해주세요.</p>`;
+                }
+            }
+            
+            async function handleDetailedAiAnalysis(classStudents) {
+                aiModalContent.innerHTML = `<div class="flex justify-center items-center p-8">
+                                                <div class="loader"></div>
+                                                <span class="ml-4 text-slate-500">상세 분석을 생성 중입니다...</span>
+                                            </div>`;
+                aiModal.classList.add('active');
+
+                try {
+                    const detailedContent = await generateDetailedAiContent(classStudents);
+                    aiModalContent.innerHTML = detailedContent;
+                } catch (error) {
+                    aiModalContent.innerHTML = `<p class="text-red-500">상세 분석을 생성하는 중 오류가 발생했습니다: ${error.message}</p>`;
+                }
+            }
+
+            async function generateDetailedAiContent(classStudents) {
+                 try {
+                    const classDataString = JSON.stringify(classStudents.map(s => ({
+                        name: s['이름'],
+                        career: s['희망진로 및 학과'] || '탐색중',
+                        subjects: getStudentCourses(s).map(c => c.subjectName)
+                    })));
+
                     const basePrompt = `당신은 대한민국 고등학교의 진로진학 전문 컨설턴트입니다. 주어진 학급 학생 데이터 ${classDataString} 를 바탕으로, 담임 선생님을 위한 심층 분석 및 구체적인 지도 방안을 작성해주세요.`;
 
                     const prompts = [
@@ -1867,28 +1920,19 @@
                     ];
 
                     let fullAnalysis = '';
-
-                    // Sequentially call the API for each part to avoid timeouts and rate limits
-                    for (let i = 0; i < prompts.length; i++) {
-                        const resultPart = await callOpenAiApiViaProxy(prompts[i].prompt);
-                        const formattedPart = resultPart.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong class="text-slate-800">$1</strong>');
-                        fullAnalysis += `<div class="mb-4"><strong>${i + 1}. ${prompts[i].title}</strong><br>${formattedPart}</div>`;
-                    }
+                    const analysisPromises = prompts.map(p => callOpenAiApiViaProxy(p.prompt));
+                    const results = await Promise.all(analysisPromises);
                     
-                    // Return the complete HTML for the card
-                    return `<h3 class="card-title">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-                                AI 종합 분석 및 지도 방안
-                            </h3>
-                            <div class="text-sm text-slate-600 space-y-2">${fullAnalysis}</div>`;
+                    results.forEach((resultPart, i) => {
+                         const formattedPart = resultPart.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong class="text-slate-800">$1</strong>');
+                         fullAnalysis += `<div class="mb-4"><strong>${i + 1}. ${prompts[i].title}</strong><br>${formattedPart}</div>`;
+                    });
+                    
+                    return fullAnalysis;
 
                 } catch (error) {
-                    console.error("AI Analysis Error:", error);
-                    return `<h3 class="card-title">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-                                AI 종합 분석 및 지도 방안
-                            </h3>
-                            <p class="text-red-500">${error.message}</p>`;
+                    console.error("Detailed AI Analysis Error:", error);
+                    throw new Error("AI 상세 분석 중 오류가 발생했습니다. Netlify 함수 설정과 환경 변수를 확인해주세요.");
                 }
             }
             
