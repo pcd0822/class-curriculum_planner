@@ -1,0 +1,2063 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학급별 과목 선택 분석 대시보드</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: linear-gradient(-45deg, #f3e7e9, #e3eeff, #ffffff, #e0c3fc);
+            background-size: 400% 400%;
+            animation: gradient 20s ease infinite;
+        }
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        header h1 {
+            background: linear-gradient(to right, #a881ff, #ff81ae, #8ec5fc, #a881ff);
+            background-size: 200% auto;
+            color: #000;
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: textGradient 10s ease infinite;
+        }
+        @keyframes textGradient {
+            0% { background-position: 200% 50%; }
+            50% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
+        .card {
+            background-color: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #334155;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .card-title svg {
+            transition: transform 0.3s ease-in-out;
+        }
+        .card-title:hover svg {
+            transform: scale(1.2) rotate(10deg);
+        }
+        .btn {
+            padding: 10px 20px;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .btn-primary {
+            background-image: linear-gradient(to right, #a881ff, #ff81ae);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(168, 129, 255, 0.3);
+        }
+        .btn-secondary {
+            background-color: #64748b;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #475569;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+        }
+        .btn-danger {
+            background-color: #ef4444;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #dc2626;
+            box-shadow: 0 6px 16px rgba(239, 68, 68, 0.2);
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #a881ff;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease-in-out;
+        }
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 600px;
+            transform: translateY(-20px);
+            transition: all 0.3s ease-in-out;
+        }
+        .modal-overlay.active .modal-content {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div class="container mx-auto p-4 sm:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold mb-2 drop-shadow-lg">학급별 과목 선택 분석 대시보드</h1>
+            <p class="text-slate-500">엑셀 데이터를 기반으로 학급별 심층 분석 및 AI 컨설팅을 제공합니다.</p>
+        </header>
+
+        <div class="max-w-5xl mx-auto bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-lg border border-slate-200">
+            <div class="space-y-4">
+                 <div class="flex flex-col sm:flex-row gap-4 items-center flex-wrap">
+                      <button id="googleSheetBtn" class="btn btn-primary w-full sm:w-auto" style="background-image: linear-gradient(to right, #34d399, #10b981);">자료 입력(Google Sheet)</button>
+                      <label for="fileUpload" class="btn btn-primary w-full sm:w-auto">
+                          엑셀 파일 업로드
+                      </label>
+                      <input type="file" id="fileUpload" class="hidden" accept=".xlsx, .xls, .csv">
+                      <button id="resetBtn" class="btn btn-danger w-full sm:w-auto">데이터 초기화</button>
+                      <p id="fileName" class="text-sm text-slate-500 flex-grow text-center sm:text-left">업로드된 파일이 없습니다.</p>
+                 </div>
+                 <hr>
+                 <div class="flex flex-col sm:flex-row gap-4 items-center">
+                      <div class="flex-grow w-full sm:w-auto">
+                          <label for="classCodeInput" class="block text-sm font-medium text-slate-600 mb-1">학급 정보 입력</label>
+                          <input type="text" id="classCodeInput" placeholder="예: 101" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition">
+                      </div>
+                      <div class="flex gap-4 self-end">
+                           <button id="analyzeBtn" class="btn btn-primary">분석하기</button>
+                      </div>
+                 </div>
+            </div>
+             <div id="loading" class="hidden flex justify-center items-center mt-8 gap-2">
+                  <div class="loader"></div>
+                  <span id="loadingText" class="text-slate-500">데이터를 분석하고 있습니다...</span>
+             </div>
+        </div>
+
+        <div id="dashboard" class="hidden mt-8 space-y-6">
+            <!-- Dashboard content will be rendered here -->
+        </div>
+
+        <div id="error" class="hidden mt-8 max-w-5xl mx-auto bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative" role="alert">
+            <strong class="font-bold">오류: </strong>
+            <span class="block sm:inline" id="errorMessage"></span>
+        </div>
+    </div>
+
+    <!-- AI Modal -->
+    <div id="aiModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="aiModalTitle" class="text-xl font-bold mb-4">AI 종합 분석 및 지도 방안</h3>
+            <div id="aiModalContent" class="text-sm text-slate-700 space-y-2 max-h-[60vh] overflow-y-auto"></div>
+            <div class="flex justify-end mt-6">
+                <button id="closeAiModalBtn" class="btn btn-secondary">닫기</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Chart.js 플러그인 정의 ---
+            const centerTextPlugin = {
+                id: 'centerText',
+                afterDraw: (chart) => {
+                    if (chart.config.type === 'doughnut' && chart.options.plugins.centerText && chart.options.plugins.centerText.display) {
+                        let ctx = chart.ctx;
+                        ctx.save();
+                        const centerConfig = chart.options.plugins.centerText;
+                        const text = centerConfig.text || '';
+                        if (!text && chart.options.plugins.centerText.currentValue === 0) {
+                            ctx.restore();
+                            return;
+                        };
+
+                        const fontStyle = 'bold ' + (chart.chartArea.width / 10) + 'px sans-serif';
+                        ctx.font = fontStyle;
+                        ctx.fillStyle = '#6b7280';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        let centerX = (chart.chartArea.left + chart.chartArea.right) / 2;
+                        let centerY = (chart.chartArea.top + chart.chartArea.bottom) / 2;
+                        
+                        let currentVal = parseFloat(chart.options.plugins.centerText.currentValue) || 0;
+                        let targetVal = parseFloat(text) || 0;
+                        
+                        if (Math.abs(currentVal - targetVal) > 0.1) {
+                            currentVal += (targetVal - currentVal) * 0.2; // 부드러운 애니메이션
+                        } else {
+                            currentVal = targetVal;
+                        }
+                        
+                        chart.options.plugins.centerText.currentValue = currentVal;
+                        if(currentVal > 0) {
+                            ctx.fillText(currentVal.toFixed(1) + '%', centerX, centerY);
+                        }
+                        ctx.restore();
+                    }
+                }
+            };
+            Chart.register(ChartDataLabels, centerTextPlugin); // 플러그인 등록
+
+            // --- 데이터 영역 ---
+            const RAW_CMS_DATA = [
+                {"subjectName": "공통국어1", "slug": "gongtonggwamog", "grade": "1", "semester": "1"},
+                {"subjectName": "공통국어2", "slug": "gongtonggugeo2", "grade": "1", "semester": "2"},
+                {"subjectName": "공통수학1", "slug": "gongtongsuhag1", "grade": "1", "semester": "1"},
+                {"subjectName": "공통수학2", "slug": "gongtongsuhag2", "grade": "1", "semester": "2"},
+                {"subjectName": "공통영어1", "slug": "gongtongyeongeo1", "grade": "1", "semester": "1"},
+                {"subjectName": "공통영어2", "slug": "gongtongyeongeo2", "grade": "1", "semester": "2"},
+                {"subjectName": "통합사회1", "slug": "tonghabsahoe1", "grade": "1", "semester": "1"},
+                {"subjectName": "통합사회2", "slug": "tonghabsahoe2", "grade": "1", "semester": "2"},
+                {"subjectName": "통합과학1", "slug": "tonghabgwahag1", "grade": "1", "semester": "1"},
+                {"subjectName": "통합과학2", "slug": "tonghabgwahag2", "grade": "1", "semester": "2"},
+                {"subjectName": "한국사1", "slug": "hangugsa1", "grade": "1", "semester": "1"},
+                {"subjectName": "한국사2", "slug": "hangugsa2", "grade": "1", "semester": "2"},
+                {"subjectName": "과학탐구실험1", "slug": "gwahagtamgusilheom1", "grade": "1", "semester": "1"},
+                {"subjectName": "과학탐구실험2", "slug": "gwahagtamgusilheom2", "grade": "1", "semester": "2"},
+                {"subjectName": "체육1", "slug": "ceyug1", "grade": "1", "semester": "1"},
+                {"subjectName": "체육2", "slug": "ceyug2", "grade": "1", "semester": "2"},
+                {"subjectName": "음악", "slug": "eumag", "grade": "1", "semester": "1"},
+                {"subjectName": "미술", "slug": "misul", "grade": "1", "semester": "2"},
+                {"subjectName": "문학", "slug": "munhag-f72be", "grade": "2", "semester": "1"},
+                {"subjectName": "독서와 작문", "slug": "dokseowajakmun", "grade": "2", "semester": "2"},
+                {"subjectName": "대수", "slug": "daesoo", "grade": "2", "semester": "1"},
+                {"subjectName": "미적분I", "slug": "mijeogbuni", "grade": "2", "semester": "2"},
+                {"subjectName": "영어I", "slug": "yeongeoi", "grade": "2", "semester": "1"},
+                {"subjectName": "영어 독해와 작문", "slug": "yeongeodokhaewajakmun", "grade": "2", "semester": "2"},
+                {"subjectName": "스포츠 문화", "slug": "sportsmunhwa", "grade": "2", "semester": "1"},
+                {"subjectName": "스포츠 과학", "slug": "sportsgwahak", "grade": "2", "semester": "2"},
+                {"subjectName": "스포츠 생활1", "slug": "sportssaenghwal1", "grade": "3", "semester": "1"},
+                {"subjectName": "스포츠 생활2", "slug": "sportssaenghwal2", "grade": "3", "semester": "2"},
+                {"subjectName": "주제 탐구 독서", "slug": "jujetamgudokseo", "grade": "2", "semester": "1"},
+                {"subjectName": "인공지능 수학", "slug": "ingongjineungsuhak", "grade": "2", "semester": "1"},
+                {"subjectName": "세계 문화와 영어", "slug": "segyemunhwawayeongeo", "grade": "2", "semester": "1"},
+                {"subjectName": "물리학", "slug": "mulrihag", "grade": "2", "semester": "1"},
+                {"subjectName": "화학", "slug": "hwahag", "grade": "2", "semester": "1"},
+                {"subjectName": "생명과학", "slug": "saengmyeonggwahag", "grade": "2", "semester": "1"},
+                {"subjectName": "지구과학", "slug": "jigugwahag", "grade": "2", "semester": "1"},
+                {"subjectName": "세계사", "slug": "segyesa", "grade": "2", "semester": "1"},
+                {"subjectName": "세계시민과 지리", "slug": "segyesimingwajiri", "grade": "2", "semester": "1"},
+                {"subjectName": "법과 사회", "slug": "beopgwasahoe", "grade": "2", "semester": "1"},
+                {"subjectName": "인문학과 윤리", "slug": "inmunhakgwayunri", "grade": "2", "semester": "1"},
+                {"subjectName": "일본어", "slug": "ilboneo", "grade": "2", "semester": "1"},
+                {"subjectName": "중국어", "slug": "junggugeo", "grade": "2", "semester": "1"},
+                {"subjectName": "한문", "slug": "hanmun", "grade": "2", "semester": "1"},
+                {"subjectName": "미술창작", "slug": "misulchangjak", "grade": "2", "semester": "1"},
+                {"subjectName": "문학과 영상", "slug": "munhakgwayeongsang", "grade": "2", "semester": "2"},
+                {"subjectName": "언어생활 탐구", "slug": "eoneosaenghwaltamgu", "grade": "2", "semester": "2"},
+                {"subjectName": "기하", "slug": "giha", "grade": "2", "semester": "2"},
+                {"subjectName": "미디어 영어", "slug": "midieoyeongeo", "grade": "2", "semester": "2"},
+                {"subjectName": "사회와 문화", "slug": "sahoewamunhwa", "grade": "2", "semester": "2"},
+                {"subjectName": "현대사회와 윤리", "slug": "hyeondaesahoewayunri", "grade": "2", "semester": "2"},
+                {"subjectName": "도시의 미래 탐구", "slug": "hyeondaesadosiuimiraetamguhoewayunri", "grade": "2", "semester": "2"},
+                {"subjectName": "동아시아 역사 기행", "slug": "dongasiayeoksagihaeng", "grade": "2", "semester": "2"},
+                {"subjectName": "역학과 에너지", "slug": "yeoghaggwa-eneoji", "grade": "2", "semester": "2"},
+                {"subjectName": "물질과 에너지", "slug": "muljilgwa-eneoji", "grade": "2", "semester": "2"},
+                {"subjectName": "세포와 물질대사", "slug": "sepowa-muljildaesa", "grade": "2", "semester": "2"},
+                {"subjectName": "지구시스템과학", "slug": "jigusiseutemgwahag", "grade": "2", "semester": "2"},
+                {"subjectName": "음악 감상과 비평", "slug": "eumakgamsanggwabipyeong", "grade": "2", "semester": "2"},
+                {"subjectName": "정보", "slug": "jeongbo", "grade": "2", "semester": "2"},
+                {"subjectName": "인간과 심리", "slug": "ingangwa-simri", "grade": "2", "semester": "2"},
+                {"subjectName": "화법과 언어", "slug": "hwabeopgwaeoneo", "grade": "3", "semester": "1"},
+                {"subjectName": "독서 토론과 글쓰기", "slug": "dokseotorongwa-geulssgi", "grade": "3", "semester": "1"},
+                {"subjectName": "미적분II", "slug": "mijeogbunii", "grade": "3", "semester": "1"},
+                {"subjectName": "확률과 통계", "slug": "hwagryulgwa-tonggye", "grade": "3", "semester": "1"},
+                {"subjectName": "경제수학", "slug": "gyeongjesuhak", "grade": "3", "semester": "1"},
+                {"subjectName": "영어 발표와 토론", "slug": "yeongeobalpyowatoron", "grade": "3", "semester": "1"},
+                {"subjectName": "영어II", "slug": "yeongeoii", "grade": "3", "semester": "1"},
+                {"subjectName": "정치", "slug": "jeongchi", "grade": "3", "semester": "1"},
+                {"subjectName": "한국지리 탐구", "slug": "hangukjiritamgu", "grade": "3", "semester": "1"},
+                {"subjectName": "윤리와 사상", "slug": "yunriwasasang", "grade": "3", "semester": "1"},
+                {"subjectName": "역사로 탐구하는 현대 세계", "slug": "yeoksaro-tamguhaneun-hyeondaesegye", "grade": "3", "semester": "1"},
+                {"subjectName": "전자기와 양자", "slug": "jeonjagiwa-yangja", "grade": "3", "semester": "1"},
+                {"subjectName": "화학 반응의 세계", "slug": "hwahag-baneungyi-segye", "grade": "3", "semester": "1"},
+                {"subjectName": "생물의 유전", "slug": "saengmulyi-yujeon", "grade": "3", "semester": "1"},
+                {"subjectName": "행성우주과학", "slug": "haengseongujugwahag", "grade": "3", "semester": "1"},
+                {"subjectName": "미술과 매체", "slug": "misulgwa-maeche", "grade": "3", "semester": "1"},
+                {"subjectName": "데이터 과학", "slug": "deiteogwahak", "grade": "3", "semester": "1"},
+                {"subjectName": "교육의 이해", "slug": "gyoyuguiihae", "grade": "3", "semester": "1"},
+                {"subjectName": "보건", "slug": "bogeon", "grade": "3", "semester": "1"},
+                {"subjectName": "마케팅과 광고", "slug": "maketinggwagwanggo", "grade": "3", "semester": "1"},
+                {"subjectName": "매체 의사소통", "slug": "maecheuisasotong", "grade": "3", "semester": "2"},
+                {"subjectName": "수학과 문화", "slug": "suhakgwamunhwa", "grade": "3", "semester": "2"},
+                {"subjectName": "실생활 영어 회화", "slug": "silsaenghwal-yeongeo-hoehwa", "grade": "3", "semester": "2"},
+                {"subjectName": "사회문제 탐구", "slug": "sahoemunjetamgu", "grade": "3", "semester": "2"},
+                {"subjectName": "여행지리", "slug": "yeohaengjiri", "grade": "3", "semester": "2"},
+                {"subjectName": "윤리문제 탐구", "slug": "yunrimunjetamgu", "grade": "3", "semester": "2"},
+                {"subjectName": "음악과 미디어", "slug": "eumakgwa-midieo", "grade": "3", "semester": "2"},
+                {"subjectName": "생태와 환경", "slug": "saengtaewa-hwangyeong", "grade": "3", "semester": "2"},
+                {"subjectName": "인간과 철학", "slug": "ingangwa-cheolhak", "grade": "3", "semester": "2"},
+                {"subjectName": "인간과 경제활동", "slug": "ingangwa-gyeongjehwaldong", "grade": "3", "semester": "2"},
+                {"subjectName": "직무 의사소통", "slug": "jikmuisasotong", "grade": "3", "semester": "2"},
+                {"subjectName": "직무 영어", "slug": "jikmuyeongeo", "grade": "3", "semester": "2"},
+                {"subjectName": "직무 수학", "slug": "jikmusuhak", "grade": "3", "semester": "2"},
+                {"subjectName": "기후변화와 환경생태", "slug": "gihubyeonhwawa-hwangyeongsaengtae", "grade": "3", "semester": "2"},
+                {"subjectName": "과학의 역사와 문화", "slug": "gwahagui-yeoksawa-munhwa", "grade": "3", "semester": "2"},
+            ];
+            const courseDetails = {
+                'gongtonggwamog': { credits: 4, category: '기초교과', subCategory: '국어', required: true, offered: true },
+                'gongtonggugeo2': { credits: 4, category: '기초교과', subCategory: '국어', required: true, offered: true },
+                'gongtongsuhag1': { credits: 4, category: '기초교과', subCategory: '수학', required: true, offered: true },
+                'gongtongsuhag2': { credits: 4, category: '기초교과', subCategory: '수학', required: true, offered: true },
+                'gongtongyeongeo1': { credits: 4, category: '기초교과', subCategory: '영어', required: true, offered: true },
+                'gongtongyeongeo2': { credits: 4, category: '기초교과', subCategory: '영어', required: true, offered: true },
+                'tonghabsahoe1': { credits: 4, category: '탐구교과', subCategory: '사회', required: true, offered: true },
+                'tonghabsahoe2': { credits: 4, category: '탐구교과', subCategory: '사회', required: true, offered: true },
+                'tonghabgwahag1': { credits: 4, category: '탐구교과', subCategory: '과학', required: true, offered: true },
+                'tonghabgwahag2': { credits: 4, category: '탐구교과', subCategory: '과학', required: true, offered: true },
+                'hangugsa1': { credits: 3, category: '기초교과', subCategory: '한국사', required: true, offered: true },
+                'hangugsa2': { credits: 3, category: '기초교과', subCategory: '한국사', required: true, offered: true },
+                'gwahagtamgusilheom1': { credits: 1, category: '탐구교과', subCategory: '과학', required: true, offered: true },
+                'gwahagtamgusilheom2': { credits: 1, category: '탐구교과', subCategory: '과학', required: true, offered: true },
+                'ceyug1': { credits: 2, category: '체육교과', subCategory: '체육', required: true, offered: true },
+                'ceyug2': { credits: 2, category: '체육교과', subCategory: '체육', required: true, offered: true },
+                'eumag': { credits: 3, category: '예술교과', subCategory: '예술', required: true, offered: true },
+                'misul': { credits: 3, category: '예술교과', subCategory: '예술', required: true, offered: true },
+                'munhag-f72be': { credits: 4, category: '기초교과', subCategory: '국어', required: true, offered: true },
+                'dokseowajakmun': { credits: 4, category: '기초교과', subCategory: '국어', required: true, offered: true },
+                'daesoo': { credits: 4, category: '기초교과', subCategory: '수학', required: true, offered: true },
+                'mijeogbuni': { credits: 4, category: '기초교과', subCategory: '수학', required: true, offered: true },
+                'yeongeoi': { credits: 4, category: '기초교과', subCategory: '영어', required: true, offered: true },
+                'yeongeodokhaewajakmun': { credits: 4, category: '기초교과', subCategory: '영어', required: true, offered: true },
+                'sportsmunhwa': { credits: 1, category: '체육교과', subCategory: '체육', required: true, offered: true },
+                'sportsgwahak': { credits: 1, category: '체육교과', subCategory: '체육', required: true, offered: true },
+                'sportssaenghwal1': { credits: 2, category: '체육교과', subCategory: '체육', required: true, offered: true },
+                'sportssaenghwal2': { credits: 2, category: '체육교과', subCategory: '체육', required: true, offered: true },
+                'jujetamgudokseo': { credits: 4, category: '기초교과', subCategory: '국어', required: false, offered: true },
+                'ingongjineungsuhak': { credits: 4, category: '기초교과', subCategory: '수학', required: false, offered: true },
+                'segyemunhwawayeongeo': { credits: 4, category: '기초교과', subCategory: '영어', required: false, offered: true },
+                'mulrihag': { credits: 4, category: '탐구교과', subCategory: '과학', required: false, offered: true },
+                'hwahag': { credits: 4, category: '탐구교과', subCategory: '과학', required: false, offered: true },
+                'saengmyeonggwahag': { credits: 4, category: '탐구교과', subCategory: '과학', required: false, offered: true },
+                'jigugwahag': { credits: 4, category: '탐구교과', subCategory: '과학', required: false, offered: true },
+                'segyesa': { credits: 4, category: '탐구교과', subCategory: '사회', required: false, offered: true },
+                'segyesimingwajiri': { credits: 4, category: '탐구교과', subCategory: '사회', required: false, offered: true },
+                'beopgwasahoe': { credits: 4, category: '탐구교과', subCategory: '사회', required: false, offered: true },
+                'inmunhakgwayunri': { credits: 4, category: '탐구교과', subCategory: '사회', required: false, offered: true },
+                'ilboneo': { credits: 4, category: '생활교양교과', subCategory: '제2외국어/정보/교양', required: false, offered: true },
+                'junggugeo': { credits: 4, category: '생활교양교과', subCategory: '제2외국어/정보/교양', required: false, offered: true },
+                'hanmun': { credits: 4, category: '생활교양교과', subCategory: '제2외국어/정보/교양', required: false, offered: true },
+                'misulchangjak': { credits: 4, category: '예술교과', subCategory: '예술', required: false, offered: true },
+                'munhakgwayeongsang': { credits: 4, category: '기초교과', subCategory: '국어', required: false, offered: true },
+                'eoneosaenghwaltamgu': { credits: 4, category: '기초교과', subCategory: '국어', required: false, offered: true },
+                'giha': { credits: 4, category: '기초교과', subCategory: '수학', required: false, offered: true },
+                'midieoyeongeo': { credits: 4, category: '기초교과', subCategory: '영어', required: false, offered: true },
+                'sahoewamunhwa': { credits: 4, category: '탐구교과', subCategory: '사회', required: false, offered: true },
+                'hyeondaesahoewayunri': { credits: 4, category: '탐구교과', subCategory: '사회', required: false, offered: true },
+                'hyeondaesadosiuimiraetamguhoewayunri': { credits: 4, category: '탐구교과', subCategory: '사회', required: false, offered: true },
+                'dongasiayeoksagihaeng': { credits: 4, category: '탐구교과', subCategory: '사회', required: false, offered: true },
+                'yeoghaggwa-eneoji': { credits: 4, category: '탐구교과', subCategory: '과학', required: false, offered: true, prerequisites: ['mulrihag'] },
+                'muljilgwa-eneoji': { credits: 4, category: '탐구교과', subCategory: '과학', required: false, offered: true, prerequisites: ['hwahag'] },
+                'sepowa-muljildaesa': { credits: 4, category: '탐구교과', subCategory: '과학', required: false, offered: true, prerequisites: ['saengmyeonggwahag'] },
+                'jigusiseutemgwahag': { credits: 4, category: '탐구교과', subCategory: '과학', required: false, offered: true, prerequisites: ['jigugwahag'] },
+                'eumakgamsanggwabipyeong': { credits: 4, category: '예술교과', subCategory: '예술', required: false, offered: true },
+                'jeongbo': { credits: 4, category: '생활교양교과', subCategory: '제2외국어/정보/교양', required: false, offered: true },
+                'ingangwa-simri': { credits: 4, category: '생활교양교과', subCategory: '제2외국어/정보/교양', required: false, offered: true },
+                'hwabeopgwaeoneo': { credits: 4, category: '기초교과', subCategory: '국어', required: false, offered: true },
+                'dokseotorongwa-geulssgi': { credits: 4, category: '기초교과', subCategory: '국어', required: false, offered: true },
+                'mijeogbunii': { credits: 4, category: '기초교과', subCategory: '수학', required: false, offered: true, prerequisites: ['mijeogbuni'] },
+                'hwagryulgwa-tonggye': { credits: 4, category: '기초교과', subCategory: '수학', required: false, offered: true },
+                'gyeongjesuhak': { credits: 4, category: '기초교과', subCategory: '수학', required: false, offered: true },
+                'yeongeobalpyowatoron': { credits: 4, category: '기초교과', subCategory: '영어', required: false, offered: true },
+                'yeongeoii': { credits: 4, category: '기초교과', subCategory: '영어', required: false, offered: true },
+                'jeongchi': { credits: 4, category: '탐구교과', subCategory: '사회', required: false, offered: true },
+                'hangukjiritamgu': { credits: 4, category: '탐구교과', subCategory: '사회', required: false, offered: true },
+                'yunriwasasang': { credits: 4, category: '탐구교과', subCategory: '사회', required: false, offered: true },
+                'yeoksaro-tamguhaneun-hyeondaesegye': { credits: 4, category: '탐구교과', subCategory: '사회', required: false, offered: true },
+                'jeonjagiwa-yangja': { credits: 4, category: '탐구교과', subCategory: '과학', required: false, offered: true, prerequisites: ['mulrihag'] },
+                'hwahag-baneungyi-segye': { credits: 4, category: '탐구교과', subCategory: '과학', required: false, offered: true, prerequisites: ['hwahag'] },
+                'saengmulyi-yujeon': { credits: 4, category: '탐구교과', subCategory: '과학', required: false, offered: true, prerequisites: ['saengmyeonggwahag'] },
+                'haengseongujugwahag': { credits: 4, category: '탐구교과', subCategory: '과학', required: false, offered: true, prerequisites: ['jigugwahag'] },
+                'misulgwa-maeche': { credits: 4, category: '예술교과', subCategory: '예술', required: false, offered: true },
+                'deiteogwahak': { credits: 4, category: '생활교양교과', subCategory: '제2외국어/정보/교양', required: false, offered: true },
+                'gyoyuguiihae': { credits: 4, category: '생활교양교과', subCategory: '제2외국어/정보/교양', required: false, offered: true },
+                'bogeon': { credits: 4, category: '생활교양교과', subCategory: '제2외국어/정보/교양', required: false, offered: true },
+                'maketinggwagwanggo': { credits: 4, category: '생활교양교과', subCategory: '제2외국어/정보/교양', required: false, offered: true },
+                'maecheuisasotong': { credits: 4, category: '기초교과', subCategory: '국어', required: false, offered: true },
+                'suhakgwamunhwa': { credits: 4, category: '기초교과', subCategory: '수학', required: false, offered: true },
+                'silsaenghwal-yeongeo-hoehwa': { credits: 4, category: '기초교과', subCategory: '영어', required: false, offered: true },
+                'sahoemunjetamgu': { credits: 4, category: '탐구교과', subCategory: '사회', required: false, offered: true },
+                'yeohaengjiri': { credits: 4, 'category': '탐구교과', subCategory: '사회', required: false, offered: true },
+                'yunrimunjetamgu': { credits: 4, category: '탐구교과', subCategory: '사회', required: false, offered: true },
+                'eumakgwa-midieo': { credits: 4, category: '예술교과', subCategory: '예술', required: false, offered: true },
+                'saengtaewa-hwangyeong': { credits: 4, category: '생활교양교과', subCategory: '제2외국어/정보/교양', required: false, offered: true },
+                'ingangwa-cheolhak': { credits: 4, category: '생활교양교과', subCategory: '제2외국어/정보/교양', required: false, offered: true },
+                'ingangwa-gyeongjehwaldong': { credits: 4, category: '생활교양교과', subCategory: '제2외국어/정보/교양', required: false, offered: true },
+                'jikmuisasotong': { credits: 3, category: '기초교과', subCategory: '국어', required: false, offered: true },
+                'jikmuyeongeo': { credits: 3, category: '기초교과', subCategory: '영어', required: false, offered: true },
+                'jikmusuhak': { credits: 3, category: '기초교과', subCategory: '수학', required: false, offered: true },
+                'gihubyeonhwawa-hwangyeongsaengtae': { credits: 3, category: '탐구교과', subCategory: '과학', required: false, offered: true },
+                'gwahagui-yeoksawa-munhwa': { credits: 3, category: '탐구교과', subCategory: '과학', required: false, offered: true },
+            };
+            const careerRecommendationsData = {
+                'AI학과': {
+                    recommended: ['인공지능 수학', '확률과 통계'],
+                    required: ['기하', '미적분II']
+                },
+                'IT융합공학과': {
+                    recommended: ['인공지능 수학', '확률과 통계'],
+                    required: ['기하', '미적분II']
+                },
+                'IT응용공학과': {
+                    recommended: ['물리학', '미적분II', '확률과 통계'],
+                    required: []
+                },
+                '간호학과': {
+                    recommended: ['화학', '화학 반응의 세계', '생명과학', '생물의 유전', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '확률과 통계', '미적분II']
+                },
+                '건설환경공학부': {
+                    recommended: ['물리학', '확률과 통계', '기하'],
+                    required: ['기하', '미적분II']
+                },
+                '건축공학과': {
+                    recommended: ['물리학', '기하', '확률과 통계'],
+                    required: ['물리학', '미적분II']
+                },
+                '건축학과': {
+                    recommended: ['물리학', '기하', '확률과 통계', '미적분II'],
+                    required: ['미적분II']
+                },
+                '건축학부': {
+                    recommended: ['물리학', '기하', '확률과 통계'],
+                    required: ['미적분II']
+                },
+                '경제학부': {
+                    recommended: ['경제수학', '미적분II', '확률과 통계'],
+                    required: []
+                },
+                '고분자공학과': {
+                    recommended: ['전자기와 양자', '화학 반응의 세계', '기하'],
+                    required: ['물리학', '화학', '미적분II']
+                },
+                '공과대학': {
+                    recommended: ['전자기와 양자', '물리학', '화학', '화학 반응의 세계', '생명과학', '생물의 유전'],
+                    required: []
+                },
+                '관광컨벤션학과': {
+                    recommended: ['영어 독해와 작문', '실생활 영어 회화'],
+                    required: []
+                },
+                '광메카트로닉스공학과': {
+                    recommended: ['물리학', '생명과학', '화학'],
+                    required: ['미적분II']
+                },
+                '국제학부': {
+                    recommended: ['영어 독해와 작문', '실생활 영어 회화'],
+                    required: []
+                },
+                '글로벌바이오메디컬공학과': {
+                    recommended: ['화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학']
+                },
+                '기계공학과': {
+                    recommended: ['화학 반응의 세계', '확률과 통계'],
+                    required: ['물리학', '전자기와 양자', '화학', '기하', '미적분II']
+                },
+                '기계공학부': {
+                    recommended: ['물리학', '전자기와 양자', '화학', '화학 반응의 세계', '기하', '확률과 통계'],
+                    required: ['물리학', '전자기와 양자', '화학', '미적분II', '기하']
+                },
+                '기계로봇에너지공학과': {
+                    recommended: ['물리학', '전자기와 양자', '화학', '화학 반응의 세계', '기하', '확률과 통계'],
+                    required: ['물리학', '전자기와 양자', '화학', '미적분II', '기하']
+                },
+                '나노공학과': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '화학', '화학 반응의 세계', '미적분II']
+                },
+                '나노메카트로닉스공학과': {
+                    recommended: ['전자기와 양자', '화학 반응의 세계', '기하'],
+                    required: ['물리학', '화학', '미적분II']
+                },
+                '나노에너지공학과': {
+                    recommended: ['전자기와 양자', '화학 반응의 세계', '기하'],
+                    required: ['물리학', '화학', '미적분II']
+                },
+                '농경제사회학부': {
+                    recommended: ['미적분II', '확률과 통계'],
+                    required: []
+                },
+                '대기과학과': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '지구과학', '행성우주과학', '화학', '미적분II']
+                },
+                '대기환경과학과': {
+                    recommended: ['지구과학', '물리학', '미적분II'],
+                    required: []
+                },
+                '데이터과학과': {
+                    recommended: ['기하'],
+                    required: []
+                },
+                '도시공학과': {
+                    recommended: ['물리학', '기하', '확률과 통계'],
+                    required: ['미적분II']
+                },
+                '동물생명자원과학과': {
+                    recommended: ['생명과학', '화학'],
+                    required: []
+                },
+                '디스플레이융합공학과': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '화학', '화학 반응의 세계', '미적분II']
+                },
+                '디자인학과(디자인앤테크놀리지전공)': {
+                    recommended: ['물리학', '미적분II', '확률과 통계'],
+                    required: []
+                },
+                '물리ㆍ천문학부(물리학전공)': {
+                    recommended: ['확률과 통계'],
+                    required: ['전자기와 양자', '기하', '미적분II']
+                },
+                '물리ㆍ천문학부(천문학전공)': {
+                    recommended: ['행성우주과학', '전자기와 양자', '확률과 통계'],
+                    required: ['지구과학', '기하', '미적분II']
+                },
+                '물리교육과': {
+                    recommended: ['전자기와 양자', '화학', '확률과 통계', '기하', '미적분II'],
+                    required: ['물리학', '전자기와 양자', '기하', '미적분II']
+                },
+                '물리학과': {
+                    recommended: ['화학', '물리학', '전자기와 양자', '확률과 통계'],
+                    required: ['물리학', '전자기와 양자', '기하', '미적분II']
+                },
+                '미생물학과': {
+                    recommended: ['화학'],
+                    required: ['생명과학']
+                },
+                '바이오메카트로닉스학과': {
+                    recommended: ['화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학']
+                },
+                '바이오산업기계공학과': {
+                    recommended: ['전자기와 양자'],
+                    required: ['물리학', '미적분II']
+                },
+                '바이오소재과학과': {
+                    recommended: ['생명과학', '생물의 유전', '화학', '화학 반응의 세계'],
+                    required: []
+                },
+                '바이오시스템ㆍ소재학부': {
+                    recommended: ['전자기와 양자', '화학 반응의 세계'],
+                    required: ['기하', '미적분II']
+                },
+                '바이오시스템의과학부': {
+                    recommended: ['생명과학', '생물의 유전', '화학', '화학 반응의 세계'],
+                    required: []
+                },
+                '바이오의공학부': {
+                    recommended: ['생명과학', '생물의 유전', '물리학', '전자기와 양자'],
+                    required: []
+                },
+                '바이오환경에너지학과': {
+                    recommended: ['생명과학', '화학'],
+                    required: []
+                },
+                '반도체공학과': {
+                    recommended: ['물리학', '전자기와 양자'],
+                    required: []
+                },
+                '반도체시스템공학과': {
+                    recommended: ['확률과 통계'],
+                    required: ['물리학', '전자기와 양자', '화학', '기하', '미적분II']
+                },
+                '보건환경융합과학부': {
+                    recommended: ['생명과학', '생물의 유전', '화학', '화학 반응의 세계'],
+                    required: []
+                },
+                '분자생물학과': {
+                    recommended: ['생물의 유전', '화학'],
+                    required: ['생명과학']
+                },
+                '불어불문학과': {
+                    recommended: ['일본어'],
+                    required: []
+                },
+                '사이버국방학과': {
+                    recommended: ['기하'],
+                    required: []
+                },
+                '사회기반시스템공학과': {
+                    recommended: ['물리학', '화학', '기하', '확률과 통계'],
+                    required: ['물리학', '미적분II']
+                },
+                '사회기반시스템공학부 건설환경플랜트공학': {
+                    recommended: ['물리학', '기하', '확률과 통계'],
+                    required: ['미적분II']
+                },
+                '사회기반시스템공학부 도시시스템공학': {
+                    recommended: ['물리학', '기하', '확률과 통계'],
+                    required: ['미적분II']
+                },
+                '사회환경시스템공학부': {
+                    recommended: ['물리학', '기하', '확률과 통계'],
+                    required: ['미적분II']
+                },
+                '산업경영공학과': {
+                    recommended: [],
+                    required: ['미적분II', '확률과 통계']
+                },
+                '산업공학과': {
+                    recommended: ['확률과 통계'],
+                    required: ['미적분II', '확률과 통계']
+                },
+                '산업보안학과': {
+                    recommended: ['인공지능 수학', '확률과 통계'],
+                    required: ['기하', '미적분II']
+                },
+                '생명공학과': {
+                    recommended: ['화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생물의 유전', '화학', '생명과학']
+                },
+                '생명과학과': {
+                    recommended: ['화학', '화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학']
+                },
+                '생명과학부': {
+                    recommended: ['생명과학', '생물의 유전', '화학', '화학 반응의 세계', '기하', '확률과 통계'],
+                    required: ['생물의 유전', '미적분II']
+                },
+                '생명자원공학부 동물생명공학': {
+                    recommended: ['화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학']
+                },
+                '생명자원공학부 식물생명공학': {
+                    recommended: ['화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학']
+                },
+                '생명환경화학과': {
+                    recommended: ['생물의 유전', '화학 반응의 세계'],
+                    required: ['생명과학', '화학']
+                },
+                '생물교육과': {
+                    recommended: ['생물의 유전', '화학', '화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전']
+                },
+                '생물학과': {
+                    recommended: ['화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학']
+                },
+                '생체의공학과': {
+                    recommended: ['확률과 통계'],
+                    required: ['물리학', '전자기와 양자', '화학', '기하', '미적분II']
+                },
+                '생화학과': {
+                    recommended: ['화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학']
+                },
+                '소프트웨어융합학과': {
+                    recommended: ['인공지능 수학', '확률과 통계'],
+                    required: ['기하', '미적분II']
+                },
+                '소프트웨어학과': {
+                    recommended: ['인공지능 수학', '확률과 통계'],
+                    required: ['기하', '미적분II']
+                },
+                '소프트웨어학부': {
+                    recommended: ['인공지능 수학', '확률과 통계'],
+                    required: ['기하', '미적분II']
+                },
+                '수리과학부': {
+                    recommended: [],
+                    required: ['기하', '미적분II', '확률과 통계']
+                },
+                '수의예과': {
+                    recommended: ['미적분II', '확률과 통계'],
+                    required: ['생물의 유전']
+                },
+                '수학과': {
+                    recommended: ['확률과 통계', '기하'],
+                    required: ['기하', '미적분II']
+                },
+                '수학교육과': {
+                    recommended: ['기하', '확률과 통계'],
+                    required: ['기하', '미적분II', '확률과 통계']
+                },
+                '스마트모빌리티학부': {
+                    recommended: ['화학', '화학 반응의 세계', '물리학', '전자기와 양자'],
+                    required: []
+                },
+                '스마트보안학부': {
+                    recommended: ['기하'],
+                    required: []
+                },
+                '스마트팜과학과': {
+                    recommended: ['화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생물의 유전', '화학', '생명과학']
+                },
+                '시스템경영공학과': {
+                    recommended: [],
+                    required: ['미적분II', '확률과 통계']
+                },
+                '시스템반도체공학과': {
+                    recommended: ['확률과 통계'],
+                    required: ['물리학', '전자기와 양자', '화학', '기하', '미적분II']
+                },
+                '시스템생명공학과': {
+                    recommended: ['화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학']
+                },
+                '시스템생물학과': {
+                    recommended: ['화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학']
+                },
+                '식물생명과학과': {
+                    recommended: ['화학'],
+                    required: ['생명과학']
+                },
+                '식물생산과학부': {
+                    recommended: ['화학 반응의 세계', '기하', '미적분II', '확률과 통계'],
+                    required: ['생물의 유전']
+                },
+                '식물환경신소재공학과': {
+                    recommended: ['화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학']
+                },
+                '식품ㆍ동물생명공학부': {
+                    recommended: [],
+                    required: ['생물의 유전', '화학 반응의 세계']
+                },
+                '식품공학과': {
+                    recommended: ['생명과학', '생물의 유전', '화학', '화학 반응의 세계'],
+                    required: ['생명과학', '화학']
+                },
+                '식품생명공학과': {
+                    recommended: ['화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학']
+                },
+                '식품영양학과': {
+                    recommended: ['화학 반응의 세계', '생물의 유전', '화학', '생명과학', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학']
+                },
+                '식품자원경제학과': {
+                    recommended: ['경제수학', '미적분II', '확률과 통계'],
+                    required: []
+                },
+                '신소재공학부': {
+                    recommended: ['물리학', '전자기와 양자', '화학', '화학 반응의 세계', '기하', '확률과 통계'],
+                    required: ['물리학', '화학', '화학 반응의 세계', '미적분II']
+                },
+                '약과학과': {
+                    recommended: ['물리학', '기하', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학', '화학 반응의 세계', '미적분II']
+                },
+                '약학과': {
+                    recommended: ['물리학', '기하', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학', '화학 반응의 세계', '미적분II']
+                },
+                '약학부': {
+                    recommended: ['생물의 유전', '화학 반응의 세계', '물리학', '기하', '확률과 통계'],
+                    required: ['생명과학', '화학', '생물의 유전', '화학 반응의 세계', '미적분II']
+                },
+                '에너지시스템공학부': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '화학', '화학 반응의 세계', '미적분II']
+                },
+                '에너지자원공학과': {
+                    recommended: ['확률과 통계'],
+                    required: ['전자기와 양자', '기하', '미적분II']
+                },
+                '역사교육과': {
+                    recommended: ['한문'],
+                    required: []
+                },
+                '예술공학부': {
+                    recommended: ['인공지능 수학', '확률과 통계'],
+                    required: ['기하', '미적분II']
+                },
+                '우주과학과': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '지구과학', '행성우주과학', '화학', '미적분II']
+                },
+                '원예생명과학과': {
+                    recommended: ['생명과학', '화학'],
+                    required: []
+                },
+                '원자력공학과': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '화학', '화학 반응의 세계', '미적분II']
+                },
+                '원자핵공학과': {
+                    recommended: [],
+                    required: ['전자기와 양자', '미적분II']
+                },
+                '유기소재시스템공학과': {
+                    recommended: ['전자기와 양자', '화학 반응의 세계', '기하'],
+                    required: ['물리학', '화학', '미적분II']
+                },
+                '유전생명공학과': {
+                    recommended: ['화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학']
+                },
+                '융합공학부': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '화학', '화학 반응의 세계', '미적분II']
+                },
+                '융합생명공학과': {
+                    recommended: ['화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학']
+                },
+                '융합에너지공학과': {
+                    recommended: ['물리학', '전자기와 양자', '화학', '화학 반응의 세계'],
+                    required: []
+                },
+                '응용물리학과': {
+                    recommended: ['화학', '물리학', '전자기와 양자', '확률과 통계'],
+                    required: ['물리학', '전자기와 양자', '기하', '미적분II']
+                },
+                '응용생물화학부': {
+                    recommended: ['기하', '미적분II', '확률과 통계'],
+                    required: ['생물의 유전', '화학 반응의 세계']
+                },
+                '응용수학과': {
+                    recommended: ['확률과 통계'],
+                    required: ['기하', '미적분II']
+                },
+                '응용통계학과': {
+                    recommended: ['확률과 통계'],
+                    required: ['기하', '미적분II']
+                },
+                '응용화학과': {
+                    recommended: ['물리학', '전자기와 양자', '생명과학', '기하'],
+                    required: ['화학', '화학 반응의 세계', '미적분II', '확률과 통계']
+                },
+                '의류학과': {
+                    recommended: ['화학', '생명과학'],
+                    required: []
+                },
+                '의생명융합공학부': {
+                    recommended: ['물리학', '화학'],
+                    required: ['생명과학', '미적분II']
+                },
+                '의예과': {
+                    recommended: ['물리학', '화학 반응의 세계', '생물의 유전', '확률과 통계', '미적분II', '기하'],
+                    required: ['생명과학', '생물의 유전', '화학', '미적분II']
+                },
+                '의학부': {
+                    recommended: ['물리학', '화학 반응의 세계', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학', '미적분II']
+                },
+                '인공지능학과': {
+                    recommended: ['인공지능 수학', '확률과 통계', '기하'],
+                    required: ['기하', '미적분II']
+                },
+                '일어일문학과': {
+                    recommended: ['일본어'],
+                    required: []
+                },
+                '자유전공학부': {
+                    recommended: ['미적분II', '확률과 통계'],
+                    required: []
+                },
+                '재료공학부': {
+                    recommended: ['전자기와 양자', '화학 반응의 세계', '확률과 통계'],
+                    required: ['물리학', '화학', '미적분II', '기하']
+                },
+                '전기ㆍ정보공학부': {
+                    recommended: ['기하', '확률과 통계'],
+                    required: ['전자기와 양자', '미적분II']
+                },
+                '전기전자공학부': {
+                    recommended: ['물리학', '전자기와 양자', '확률과 통계'],
+                    required: ['물리학', '전자기와 양자', '화학', '기하', '미적분II']
+                },
+                '전기전자공학부(반도체공학전공)': {
+                    recommended: ['화학', '기하'],
+                    required: ['물리학', '미적분II']
+                },
+                '전기전자공학부(전기공학전공)': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '미적분II']
+                },
+                '전기전자공학부(전자공학전공)': {
+                    recommended: ['화학', '기하'],
+                    required: ['물리학', '미적분II']
+                },
+                '전자공학과': {
+                    recommended: ['확률과 통계'],
+                    required: ['물리학', '전자기와 양자', '화학', '기하', '미적분II']
+                },
+                '전자전기공학부': {
+                    recommended: ['확률과 통계'],
+                    required: ['물리학', '전자기와 양자', '화학', '기하', '미적분II']
+                },
+                '정보디스플레이학과': {
+                    recommended: ['확률과 통계'],
+                    required: ['물리학', '전자기와 양자', '화학', '기하', '미적분II']
+                },
+                '정보전자신소재공학과': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '화학', '화학 반응의 세계', '미적분II']
+                },
+                '정보컴퓨터공학부(인공지능전공)': {
+                    recommended: ['확률과 통계'],
+                    required: ['물리학', '미적분II']
+                },
+                '정보컴퓨터공학부(컴퓨터공학전공)': {
+                    recommended: ['확률과 통계'],
+                    required: ['물리학', '미적분II']
+                },
+                '조경ㆍ지역시스템공학부': {
+                    recommended: ['전자기와 양자', '확률과 통계'],
+                    required: ['기하', '미적분II']
+                },
+                '조경학과': {
+                    recommended: ['생명과학', '생물의 유전'],
+                    required: []
+                },
+                '조선해양공학과': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '미적분II', '기하']
+                },
+                '지구과학교육과': {
+                    recommended: ['물리학', '행성우주과학', '미적분II', '기하', '확률과 통계'],
+                    required: ['지구과학', '행성우주과학']
+                },
+                '지구시스템과학과': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '지구과학', '행성우주과학', '화학', '미적분II']
+                },
+                '지구환경과학과': {
+                    recommended: ['지구과학', '행성우주과학'],
+                    required: []
+                },
+                '지구환경과학부': {
+                    recommended: ['기하', '확률과 통계'],
+                    required: ['지구과학', '전자기와 양자', '행성우주과학', '화학 반응의 세계', '미적분II']
+                },
+                '지리학과': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '지구과학', '행성우주과학', '화학', '미적분II']
+                },
+                '지질환경과학과': {
+                    recommended: ['지구과학', '행성우주과학', '미적분II'],
+                    required: []
+                },
+                '차세대통신학과': {
+                    recommended: ['물리학', '전자기와 양자'],
+                    required: []
+                },
+                '천문우주학과': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '지구과학', '행성우주과학', '화학', '미적분II']
+                },
+                '첨단소재공학과': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '화학', '화학 반응의 세계', '미적분II']
+                },
+                '첨단융합학부': {
+                    recommended: ['물리학', '화학', '생명과학', '확률과 통계'],
+                    required: ['미적분II']
+                },
+                '치의예과': {
+                    recommended: ['물리학', '화학 반응의 세계', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학', '미적분II']
+                },
+                '컴퓨터공학과': {
+                    recommended: ['인공지능 수학', '확률과 통계'],
+                    required: ['기하', '미적분II']
+                },
+                '컴퓨터공학부': {
+                    recommended: [],
+                    required: ['미적분II', '확률과 통계']
+                },
+                '컴퓨터과학과': {
+                    recommended: ['인공지능 수학', '확률과 통계'],
+                    required: ['기하', '미적분II']
+                },
+                '컴퓨터교육과': {
+                    recommended: ['인공지능 수학', '확률과 통계'],
+                    required: ['기하', '미적분II']
+                },
+                '컴퓨터학과': {
+                    recommended: ['기하'],
+                    required: []
+                },
+                '통계학과': {
+                    recommended: ['기하', '확률과 통계'],
+                    required: ['미적분II', '확률과 통계', '기하']
+                },
+                '한문학과': {
+                    recommended: ['한문'],
+                    required: []
+                },
+                '한방생명공학과': {
+                    recommended: ['화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학']
+                },
+                '한약학과': {
+                    recommended: ['물리학', '기하', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학', '화학 반응의 세계', '미적분II']
+                },
+                '한의예과': {
+                    recommended: ['물리학', '화학 반응의 세계', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학', '미적분II']
+                },
+                '항공우주공학과': {
+                    recommended: ['전자기와 양자', '화학', '행성우주과학', '기하', '확률과 통계'],
+                    required: ['물리학', '전자기와 양자', '미적분II', '기하']
+                },
+                '해양학과': {
+                    recommended: ['지구과학', '행성우주과학', '미적분II'],
+                    required: []
+                },
+                '화공생명공학과': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '화학', '화학 반응의 세계', '미적분II']
+                },
+                '화학공학/고분자공학부': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '화학', '화학 반응의 세계', '미적분II']
+                },
+                '화학공학과': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '화학', '화학 반응의 세계', '미적분II']
+                },
+                '화학과': {
+                    recommended: ['생명과학', '물리학', '전자기와 양자', '기하', '미적분II'],
+                    required: ['화학', '화학 반응의 세계', '미적분II', '확률과 통계']
+                },
+                '화학교육과': {
+                    recommended: ['전자기와 양자', '화학 반응의 세계', '미적분II', '기하', '확률과 통계'],
+                    required: ['물리학', '화학', '화학 반응의 세계']
+                },
+                '화학부': {
+                    recommended: ['기하', '확률과 통계'],
+                    required: ['화학', '화학 반응의 세계', '미적분II']
+                },
+                '화학생물공학부': {
+                    recommended: ['물리학', '화학', '확률과 통계'],
+                    required: ['미적분II']
+                },
+                '화학신소재공학부': {
+                    recommended: ['전자기와 양자', '기하', '확률과 통계'],
+                    required: ['물리학', '화학', '화학 반응의 세계', '미적분II']
+                },
+                '환경생태공학부': {
+                    recommended: ['생명과학', '생물의 유전', '화학', '화학 반응의 세계'],
+                    required: []
+                },
+                '환경학및환경공학과': {
+                    recommended: ['화학 반응의 세계', '미적분II', '확률과 통계'],
+                    required: ['생명과학', '생물의 유전', '화학']
+                },
+            };
+            
+            // --- 전역 변수 및 초기화 ---
+            let allStudentData = [];
+            const subjectNameToSlugMap = new Map(RAW_CMS_DATA.map(item => [item.subjectName.replace(/\s/g, ''), item.slug]));
+            const charts = {};
+
+            // --- UI 요소 ---
+            const fileUploadInput = document.getElementById('fileUpload');
+            const resetBtn = document.getElementById('resetBtn');
+            const fileNameDisplay = document.getElementById('fileName');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const classCodeInput = document.getElementById('classCodeInput');
+            const loadingDiv = document.getElementById('loading');
+            const loadingText = document.getElementById('loadingText');
+            const dashboardDiv = document.getElementById('dashboard');
+            const errorDiv = document.getElementById('error');
+            const errorMessageSpan = document.getElementById('errorMessage');
+            const googleSheetBtn = document.getElementById('googleSheetBtn');
+            const aiModal = document.getElementById('aiModal');
+            const aiModalContent = document.getElementById('aiModalContent');
+            const closeAiModalBtn = document.getElementById('closeAiModalBtn');
+
+            // --- 유틸리티 함수 ---
+            function showError(message) {
+                errorMessageSpan.textContent = message;
+                errorDiv.classList.remove('hidden');
+            }
+
+            function hideError() {
+                errorDiv.classList.add('hidden');
+            }
+
+            // --- 이벤트 리스너 ---
+            initializeApp();
+            fileUploadInput.addEventListener('change', handleFileUpload);
+            resetBtn.addEventListener('click', handleReset);
+            analyzeBtn.addEventListener('click', handleAnalysis);
+            googleSheetBtn.addEventListener('click', () => {
+                const GOOGLE_SHEET_EDIT_URL = 'https://docs.google.com/spreadsheets/d/14fAtJa9DqeeN_S4tB7RS5Dgs9Upacx6NrVnHQC3pUc0/edit?usp=sharing';
+                window.open(GOOGLE_SHEET_EDIT_URL, '_blank');
+            });
+            closeAiModalBtn.addEventListener('click', () => aiModal.classList.remove('active'));
+
+            // --- 핵심 로직 ---
+            function initializeApp() {
+                const savedData = localStorage.getItem('studentData');
+                const savedFileName = localStorage.getItem('studentDataFileName');
+                if (savedData) {
+                    allStudentData = JSON.parse(savedData);
+                    fileNameDisplay.textContent = `현재 파일: ${savedFileName}`;
+                }
+            }
+
+            function handleFileUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                loadingText.textContent = '파일을 읽고 있습니다...';
+                loadingDiv.classList.remove('hidden');
+                hideError();
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                        const normalizedData = jsonData.map(row => {
+                            const newRow = {};
+                            for (const key in row) {
+                                const trimmedKey = key.trim();
+                                newRow[trimmedKey] = row[key];
+                            }
+                            if (newRow['학번']) newRow['학번'] = String(newRow['학번']);
+                            return newRow;
+                        });
+
+                        allStudentData = normalizedData;
+                        localStorage.setItem('studentData', JSON.stringify(normalizedData));
+                        localStorage.setItem('studentDataFileName', file.name);
+                        fileNameDisplay.textContent = `✅ 현재 파일: ${file.name}`;
+                        dashboardDiv.innerHTML = '';
+                        dashboardDiv.classList.add('hidden');
+                    } catch (err) {
+                        showError('엑셀 파일을 읽는 중 오류가 발생했습니다. 파일 형식을 확인해주세요.');
+                        console.error(err);
+                    } finally {
+                        loadingDiv.classList.add('hidden');
+                    }
+                };
+                reader.onerror = () => {
+                    showError('파일을 읽는 데 실패했습니다.');
+                    loadingDiv.classList.add('hidden');
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            function handleReset() {
+                localStorage.removeItem('studentData');
+                localStorage.removeItem('studentDataFileName');
+                allStudentData = [];
+                fileNameDisplay.textContent = '업로드된 파일이 없습니다.';
+                dashboardDiv.innerHTML = '';
+                dashboardDiv.classList.add('hidden');
+                hideError();
+                fileUploadInput.value = '';
+            }
+
+            async function handleAnalysis() {
+                const classCode = classCodeInput.value.trim();
+                if (!classCode) {
+                    showError('학급 정보를 입력해주세요.');
+                    return;
+                }
+                if (allStudentData.length === 0) {
+                    showError('먼저 과목 현황 자료를 업로드해주세요.');
+                    return;
+                }
+
+                hideError();
+                dashboardDiv.innerHTML = '';
+                loadingText.textContent = '데이터를 분석하고 있습니다...';
+                loadingDiv.classList.remove('hidden');
+
+                try {
+                    const classStudents = allStudentData.filter(s => String(s['학번']).startsWith(classCode));
+                    if (classStudents.length === 0) {
+                        throw new Error(`학급 코드 '${classCode}'에 해당하는 학생이 없습니다.`);
+                    }
+                    
+                    const aiAnalysisHTML = await renderAiAnalysis(classStudents);
+                    const validationHTML = renderValidationStatus(classStudents);
+
+                    dashboardDiv.innerHTML = `
+                        <div class="card">${renderClassSelection(classStudents, classCode)}</div>
+                        <div class="card" style="height: 400px;">
+                            ${renderSubjectComparisonChart(classStudents, classCode)}
+                            <div style="position: relative; height: 320px;">
+                                <canvas id="subjectCompareChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div class="card" style="height: 350px;">
+                                ${renderCareerChart(classStudents)}
+                                <div style="position: relative; height: 250px;">
+                                    <canvas id="careerChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="card" style="height: 350px;">
+                                ${renderInquiryRatioChart(classStudents)}
+                                <div style="position: relative; height: 250px;">
+                                    <canvas id="inquiryRatioChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="card" style="height: 350px;">
+                                ${renderLanguageChart(classStudents)}
+                                <div style="position: relative; height: 250px;">
+                                    <canvas id="languageChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">${renderSubjectInfoTable(classStudents, classCode)}</div>
+                        <div class="card">${renderCareerRecommendations(classStudents)}</div>
+                        <div class="card">${validationHTML}</div>
+                        <div class="card">${aiAnalysisHTML}</div>
+                    `;
+                    
+                    renderCareerChart(classStudents, true);
+                    renderSubjectComparisonChart(classStudents, classCode, true);
+                    renderInquiryRatioChart(classStudents, true);
+                    renderLanguageChart(classStudents, true);
+
+                    dashboardDiv.classList.remove('hidden');
+                } catch (err) {
+                    showError(err.message);
+                    console.error(err);
+                } finally {
+                    loadingDiv.classList.add('hidden');
+                }
+            }
+            
+            function getStudentCourses(student) {
+                const selectedSubjectNames = Object.keys(student)
+                    .filter(key => key.startsWith('선택과목') && student[key])
+                    .map(key => student[key]);
+                
+                const selectedSlugs = selectedSubjectNames
+                    .map(name => subjectNameToSlugMap.get(String(name).replace(/\s/g, '')))
+                    .filter(Boolean);
+
+                return selectedSlugs
+                    .map(slug => getFullCourseInfo(slug))
+                    .filter(course => course !== null);
+            }
+
+            function getFullCourseInfo(slug) {
+                const rawInfo = RAW_CMS_DATA.find(c => c.slug === slug);
+                const detailInfo = courseDetails[slug];
+                if (!rawInfo || !detailInfo) return null;
+                return { ...rawInfo, ...detailInfo };
+            }
+
+            function getAllStudentCourses(student) {
+                const studentGrade = String(student['학번'])[0];
+                if (!studentGrade) return [];
+
+                // Get all required courses for the student's grade and previous grades
+                const requiredCourses = RAW_CMS_DATA
+                    .map(raw => getFullCourseInfo(raw.slug))
+                    .filter(course => 
+                        course && 
+                        course.required && 
+                        parseInt(course.grade, 10) <= parseInt(studentGrade, 10)
+                    );
+
+                // Get selected courses
+                const selectedCourses = getStudentCourses(student);
+
+                // Combine and remove duplicates
+                const allCoursesMap = new Map();
+                [...requiredCourses, ...selectedCourses].forEach(course => {
+                    if (course) {
+                        allCoursesMap.set(course.slug, course);
+                    }
+                });
+
+                return Array.from(allCoursesMap.values());
+            }
+
+            // --- 렌더링 함수들 ---
+
+            function renderClassSelection(classStudents, classCode) {
+                let content = '';
+                if (classCode.startsWith('1')) {
+                    classStudents.sort((a, b) => String(a['학번']).localeCompare(String(b['학번'])));
+                    let rows = classStudents.map(student => {
+                        const courses = getStudentCourses(student);
+                        const sem1 = courses.filter(c => c.grade === '2' && c.semester === '1').map(c => c.subjectName).join(', ');
+                        const sem2 = courses.filter(c => c.grade === '2' && c.semester === '2').map(c => c.subjectName).join(', ');
+                        return `<tr>
+                                    <td class="px-2 py-1 border">${student['이름']}</td>
+                                    <td class="px-2 py-1 border text-xs">${sem1}</td>
+                                    <td class="px-2 py-1 border text-xs">${sem2}</td>
+                                </tr>`;
+                    }).join('');
+
+                    content = `<div class="overflow-auto" style="max-height: 400px;">
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-slate-100 sticky top-0"><tr>
+                                            <th class="px-2 py-1 border">학생명</th>
+                                            <th class="px-2 py-1 border">2학년 1학기 선택</th>
+                                            <th class="px-2 py-1 border">2학년 2학기 선택</th>
+                                        </tr></thead>
+                                        <tbody>${rows}</tbody>
+                                    </table>
+                                    </div>`;
+                } else {
+                    content = '<p>1학년 학급에 대한 선택과목 현황만 표시됩니다.</p>';
+                }
+                return `<h3 class="card-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                            Class ${classCode}: 선택 과목 현황
+                        </h3>${content}`;
+            }
+
+            function renderCareerChart(classStudents, isRender = false) {
+                const title = `<h3 class="card-title">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+                                    학급별 희망 진로 현황
+                                   </h3>`;
+                if (!isRender) return title;
+                
+                const classTotal = classStudents.length;
+                const hasCareerClass = classStudents.filter(s => s['희망진로 및 학과'] && !['탐색중', '', undefined, null].includes(s['희망진로 및 학과'])).length;
+                const exploringClass = classTotal - hasCareerClass;
+                
+                const ctx = document.getElementById('careerChart').getContext('2d');
+                if(charts.careerChart) charts.careerChart.destroy();
+                charts.careerChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['진로 설정', '탐색중'],
+                        datasets: [{
+                            label: '학생 수',
+                            data: [hasCareerClass, exploringClass],
+                            backgroundColor: ['rgba(168, 129, 255, 0.6)', 'rgba(209, 213, 219, 0.6)'],
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        onHover: (event, chartElement, chart) => {
+                            if (chartElement.length) {
+                                const index = chartElement[0].index;
+                                const data = chart.data.datasets[0].data;
+                                const total = data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? ((data[index] / total) * 100) : 0;
+                                chart.options.plugins.centerText.text = percentage;
+                            } else {
+                                chart.options.plugins.centerText.text = '';
+                                chart.options.plugins.centerText.currentValue = 0;
+                            }
+                        },
+                        plugins: {
+                            datalabels: {
+                                display: false,
+                            },
+                            centerText: {
+                                display: true,
+                                text: '',
+                                currentValue: 0
+                            }
+                        }
+                    }
+                });
+            }
+
+            function renderSubjectComparisonChart(classStudents, classCode, isRender = false) {
+                const title = `<h3 class="card-title">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                                    과목별 선택 인원 비교
+                                   </h3>`;
+                if (!isRender) return title;
+                
+                const gradeToAnalyze = classCode.startsWith('1') ? '2' : null;
+                if (!gradeToAnalyze) {
+                    document.getElementById('subjectCompareChart').style.display = 'none';
+                    return;
+                };
+
+                const subjectsToAnalyze = RAW_CMS_DATA.filter(c => c.grade === gradeToAnalyze && !courseDetails[c.slug].required);
+                const labels = subjectsToAnalyze.map(c => c.subjectName);
+
+                const allData = labels.map(name => {
+                    const slug = subjectNameToSlugMap.get(name.replace(/\s/g, ''));
+                    return allStudentData.filter(s => getStudentCourses(s).some(c => c.slug === slug)).length;
+                });
+                const classData = labels.map(name => {
+                    const slug = subjectNameToSlugMap.get(name.replace(/\s/g, ''));
+                    return classStudents.filter(s => getStudentCourses(s).some(c => c.slug === slug)).length;
+                });
+
+                const maxVal = Math.ceil(Math.max(...allData, ...classData) / 50) * 50;
+
+                const ctx = document.getElementById('subjectCompareChart').getContext('2d');
+                if(charts.subjectCompareChart) charts.subjectCompareChart.destroy();
+                charts.subjectCompareChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: '전체 학년', data: allData, backgroundColor: 'rgba(129, 201, 255, 0.6)' },
+                            { label: '해당 학급', data: classData, backgroundColor: 'rgba(255, 182, 129, 0.6)' }
+                        ]
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        plugins: {
+                            datalabels: {
+                                display: false
+                            }
+                        },
+                        scales: { 
+                            x: { ticks: { font: { size: 9 } } },
+                            y: {
+                                beginAtZero: true,
+                                max: maxVal > 0 ? maxVal : 50,
+                                ticks: {
+                                    stepSize: 50
+                                }
+                            }
+                        } 
+                    }
+                });
+            }
+
+            function renderSubjectInfoTable(classStudents, classCode) {
+                const gradeToAnalyze = classCode.startsWith('1') ? '2' : (classCode.startsWith('2') ? '3' : null);
+                if (!gradeToAnalyze) return '';
+
+                const subjectsToAnalyze = RAW_CMS_DATA.filter(c => c.grade === gradeToAnalyze && !courseDetails[c.slug].required);
+                
+                let rows = subjectsToAnalyze.map(subject => {
+                    const totalSelected = allStudentData.filter(s => getStudentCourses(s).some(c => c.slug === subject.slug)).length;
+                    const classSelected = classStudents.filter(s => getStudentCourses(s).some(c => c.slug === subject.slug)).length;
+
+                    const numClasses = totalSelected < 6 ? 0 : (totalSelected <= (Math.ceil(totalSelected / 25) - 1) * 28 ? Math.ceil(totalSelected / 25) - 1 : Math.ceil(totalSelected / 25));
+                    const grade1 = Math.floor(totalSelected * 0.1);
+                    const grade2 = Math.floor(totalSelected * 0.34) - grade1;
+                    const grade3 = Math.floor(totalSelected * 0.66) - (grade1 + grade2);
+
+                    return `<tr>
+                                <td class="px-2 py-1 border">${subject.subjectName}</td>
+                                <td class="px-2 py-1 border text-center">${totalSelected}</td>
+                                <td class="px-2 py-1 border text-center">${classSelected}</td>
+                                <td class="px-2 py-1 border text-center">${numClasses}</td>
+                                <td class="px-2 py-1 border text-center">${grade1}</td>
+                                <td class="px-2 py-1 border text-center">${grade2}</td>
+                                <td class="px-2 py-1 border text-center">${grade3}</td>
+                            </tr>`;
+                }).join('');
+
+                return `<h3 class="card-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14v6m-3-3h6M6 10h2a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2zm10 0h2a2 2 0 002-2V6a2 2 0 00-2-2h-2a2 2 0 00-2 2v2a2 2 0 002 2zM6 20h2a2 2 0 002-2v-2a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2z" /></svg>
+                            ${gradeToAnalyze}학년 선택 과목별 정보
+                        </h3>
+                        <div class="overflow-auto" style="max-height: 400px;">
+                            <table class="w-full text-sm">
+                                <thead class="bg-slate-100 sticky top-0"><tr>
+                                    <th class="px-2 py-1 border">과목명</th>
+                                    <th class="px-2 py-1 border">학년전체 선택</th>
+                                    <th class="px-2 py-1 border">학급전체 선택</th>
+                                    <th class="px-2 py-1 border">분반수</th>
+                                    <th class="px-2 py-1 border">1등급</th>
+                                    <th class="px-2 py-1 border">2등급</th>
+                                    <th class="px-2 py-1 border">3등급</th>
+                                </tr></thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>`;
+            }
+
+            function renderCareerRecommendations(classStudents) {
+                // 문자열 유사도 계산 (레벤슈타인 거리) 함수
+                const levenshteinDistance = (a, b) => {
+                    if (a.length === 0) return b.length;
+                    if (b.length === 0) return a.length;
+                    const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
+                    for (let i = 0; i <= a.length; i++) { matrix[0][i] = i; }
+                    for (let j = 0; j <= b.length; j++) { matrix[j][0] = j; }
+                    for (let j = 1; j <= b.length; j++) {
+                        for (let i = 1; i <= a.length; i++) {
+                            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+                            matrix[j][i] = Math.min(matrix[j][i - 1] + 1, matrix[j - 1][i] + 1, matrix[j - 1][i - 1] + cost);
+                        }
+                    }
+                    return matrix[b.length][a.length];
+                };
+
+                // 가장 유사한 학과를 찾는 함수
+                const findSimilarCareer = (studentCareer) => {
+                    const careerKeys = Object.keys(careerRecommendationsData);
+                    if (careerKeys.length === 0) return null;
+                    let minDistance = Infinity;
+                    let bestMatch = null;
+                    for (const key of careerKeys) {
+                        const distance = levenshteinDistance(studentCareer, key);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            bestMatch = key;
+                        }
+                    }
+                    // 너무 관련 없는 학과가 매칭되지 않도록 일정 거리 이내의 값만 반환
+                    if (bestMatch && minDistance < Math.min(studentCareer.length, bestMatch.length) / 1.5) {
+                        return bestMatch;
+                    }
+                    return null;
+                };
+
+                classStudents.sort((a, b) => String(a['학번']).localeCompare(String(b['학번'])));
+                let rows = classStudents.map(student => {
+                    const originalCareer = student['희망진로 및 학과'] || '탐색중';
+                    const studentCourses = getStudentCourses(student).map(c => c.subjectName);
+                    
+                    let careerData = careerRecommendationsData[originalCareer];
+                    let displayCareer = originalCareer;
+
+                    // 학생의 희망 진로가 데이터에 없으면 유사 진로를 찾음
+                    if (!careerData && originalCareer !== '탐색중') {
+                        const similarCareer = findSimilarCareer(originalCareer);
+                        if (similarCareer) {
+                            careerData = careerRecommendationsData[similarCareer];
+                            displayCareer = `${originalCareer} (유사: ${similarCareer})`;
+                        }
+                    }
+                    
+                    const requiredSubjects = careerData?.required || [];
+                    const recommendedSubjects = careerData?.recommended || [];
+                    
+                    // 필수/권장 과목을 하나로 합침
+                    const allTargetSubjects = [...new Set([...requiredSubjects, ...recommendedSubjects])];
+                    
+                    const subjectsHtml = allTargetSubjects.map(subject => {
+                        const isSelected = studentCourses.includes(subject);
+                        // 이수 여부에 따라 색상 변경
+                        return `<span class="${isSelected ? 'text-black' : 'font-bold text-red-600'}">${subject}</span>`;
+                    }).join(', ');
+                    
+                    const intersection = allTargetSubjects.filter(c => studentCourses.includes(c));
+                    const similarity = allTargetSubjects.length > 0 ? (intersection.length / allTargetSubjects.length * 100).toFixed(0) : 0;
+
+                    return `<tr>
+                                <td class="px-2 py-1 border">${student['이름']}</td>
+                                <td class="px-2 py-1 border text-xs">${displayCareer}</td>
+                                <td class="px-2 py-1 border text-xs">${subjectsHtml || '진로, 적성에 맞는 과목 이수 권장'}</td>
+                                <td class="px-2 py-1 border text-center">${similarity}%</td>
+                            </tr>`;
+                }).join('');
+
+                // 범례(Legend) 수정
+                return `<h3 class="card-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                            학생별 진로 및 과목 추천
+                        </h3>
+                        <div class="mb-2 text-xs">
+                            <span class="font-bold">범례:</span>
+                            <span class="font-bold text-red-600">■ 추천(미이수)</span> / 
+                            <span class="text-black">■ 추천(이수)</span>
+                        </div>
+                        <div class="overflow-auto" style="max-height: 400px;">
+                            <table class="w-full text-sm">
+                                <thead class="bg-slate-100 sticky top-0"><tr>
+                                    <th class="px-2 py-1 border">이름</th>
+                                    <th class="px-2 py-1 border">희망 진로(유사 추천)</th>
+                                    <th class="px-2 py-1 border">추천 과목</th>
+                                    <th class="px-2 py-1 border">일치도</th>
+                                </tr></thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>`;
+            }
+
+            function renderValidationStatus(classStudents) {
+                const basicCreditExceed = [];
+                const prereqViolations = [];
+                const artCreditShort = [];
+                const liberalArtsCreditShort = [];
+                const jointCourses = [];
+
+                const allRequiredCourseSlugs = new Set(
+                    RAW_CMS_DATA
+                        .map(raw => getFullCourseInfo(raw.slug))
+                        .filter(course => course && course.required)
+                        .map(course => course.slug)
+                );
+
+                classStudents.forEach(student => {
+                    const allCourses = getAllStudentCourses(student);
+                    if (allCourses.length === 0) return;
+
+                    // 1. 기초교과 이수학점 초과 여부 (최대 87학점)
+                    const basicCredits = allCourses
+                        .filter(c => c.category === '기초교과')
+                        .reduce((sum, c) => sum + (c.credits || 0), 0);
+                    
+                    if (basicCredits > 87) {
+                        basicCreditExceed.push({ 
+                            name: student['이름'],
+                            id: student['학번'],
+                            credits: basicCredits,
+                            excess: (basicCredits - 87).toFixed(1)
+                        });
+                    }
+
+                    // 2. 위계에 따른 과목 이수 여부
+                    const selectedCourses = getStudentCourses(student);
+                    const studentSelectedSlugs = new Set(selectedCourses.map(c => c.slug));
+                    const availableForPrereqCheck = new Set([...allRequiredCourseSlugs, ...studentSelectedSlugs]);
+
+                    const violations = selectedCourses.filter(c => 
+                        c.prerequisites && !c.prerequisites.every(p => availableForPrereqCheck.has(p))
+                    );
+
+                    if (violations.length > 0) {
+                        prereqViolations.push({
+                            name: student['이름'],
+                            id: student['학번'],
+                            courses: violations.map(v => v.subjectName).join(', ')
+                        });
+                    }
+
+                    // 3. 예술 교과 필수 이수학점 이수 여부 (10학점)
+                    const artCredits = allCourses
+                        .filter(c => c.category === '예술교과')
+                        .reduce((sum, c) => sum + (c.credits || 0), 0);
+                    if (artCredits < 10) {
+                        const artCourses = allCourses
+                            .filter(c => c.category === '예술교과')
+                            .sort((a, b) => a.grade.localeCompare(b.grade) || a.semester.localeCompare(b.semester));
+                        const coursesText = artCourses.length > 0 
+                            ? artCourses.map(c => `${c.grade}학년 ${c.semester}학기: ${c.subjectName}`).join('<br>')
+                            : '이수 내역 없음';
+
+                        artCreditShort.push({
+                            name: student['이름'],
+                            id: student['학번'],
+                            short: 10 - artCredits,
+                            courses: coursesText
+                        });
+                    }
+                    
+                    // 4. 교양/제2외국어/정보 교과 필수 이수학점 이수 여부 (16학점)
+                    const liberalArtsCredits = allCourses
+                        .filter(c => c.category === '생활교양교과')
+                        .reduce((sum, c) => sum + (c.credits || 0), 0);
+                    if (liberalArtsCredits < 16) {
+                        const liberalArtsCourses = allCourses
+                            .filter(c => c.category === '생활교양교과')
+                            .sort((a, b) => a.grade.localeCompare(b.grade) || a.semester.localeCompare(b.semester));
+                        const coursesText = liberalArtsCourses.length > 0 
+                            ? liberalArtsCourses.map(c => `${c.grade}학년 ${c.semester}학기: ${c.subjectName}`).join('<br>')
+                            : '이수 내역 없음';
+
+                        liberalArtsCreditShort.push({
+                            name: student['이름'],
+                            id: student['학번'],
+                            short: 16 - liberalArtsCredits,
+                            courses: coursesText
+                        });
+                    }
+
+                    // 5. 공동교육과정 이수자 현황
+                    const joints = [];
+                    for (let i = 1; i <= 5; i++) {
+                        const courseNameKey = `공동교육과정${i}`;
+                        const courseCreditKey = `공동교육과정${i} 학점수`;
+                        if (student[courseNameKey] && String(student[courseNameKey]).trim() !== '') {
+                            joints.push(`${student[courseNameKey]}(${student[courseCreditKey] || '?'})`);
+                        }
+                    }
+                    if (joints.length > 0) {
+                        jointCourses.push({
+                            name: student['이름'],
+                            id: student['학번'],
+                            courses: joints.join(', ')
+                        });
+                    }
+                });
+
+                const createTableHTML = (title, headers, data, renderRow) => {
+                    let rowsHTML = data.length > 0
+                        ? data.map(renderRow).join('')
+                        : `<tr><td colspan="${headers.length}" class="text-center py-2 text-slate-500">해당 학생 없음</td></tr>`;
+                    
+                    return `
+                        <div class="mt-4">
+                            <h4 class="font-semibold text-slate-700 mb-2">${title}</h4>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm border-t">
+                                    <thead class="bg-slate-50">
+                                        <tr>${headers.map(h => `<th class="px-2 py-1 border text-left font-medium">${h}</th>`).join('')}</tr>
+                                    </thead>
+                                    <tbody>${rowsHTML}</tbody>
+                                </table>
+                            </div>
+                        </div>`;
+                };
+
+                const html1 = createTableHTML(
+                    '1. 기초교과 이수학점 초과 (87학점 초과)', 
+                    ['학번', '이름', '신청학점', '초과학점'], 
+                    basicCreditExceed, 
+                    item => `<tr><td class="px-2 py-1 border">${item.id}</td><td class="px-2 py-1 border">${item.name}</td><td class="px-2 py-1 border">${item.credits} / 87</td><td class="px-2 py-1 border text-red-600 font-bold">${item.excess}</td></tr>`
+                );
+                
+                const html2 = createTableHTML(
+                    '2. 위계에 맞지 않는 과목 이수 (선이수과목 미이수)',
+                    ['학번', '이름', '해당 과목'],
+                    prereqViolations,
+                    item => `<tr><td class="px-2 py-1 border">${item.id}</td><td class="px-2 py-1 border">${item.name}</td><td class="px-2 py-1 border text-red-600 font-bold">${item.courses}</td></tr>`
+                );
+                
+                const html3 = createTableHTML(
+                    '3. 예술 교과 필수 이수학점 부족 (10학점 미만)',
+                    ['학번', '이름', '부족학점', '이수 과목'],
+                    artCreditShort,
+                    item => `<tr><td class="px-2 py-1 border">${item.id}</td><td class="px-2 py-1 border">${item.name}</td><td class="px-2 py-1 border text-red-600 font-bold">${item.short}</td><td class="px-2 py-1 border text-xs">${item.courses}</td></tr>`
+                );
+
+                const html4 = createTableHTML(
+                    '4. 교양/제2외국어/정보 교과 필수 이수학점 부족 (16학점 미만)',
+                    ['학번', '이름', '부족학점', '이수 과목'],
+                    liberalArtsCreditShort,
+                    item => `<tr><td class="px-2 py-1 border">${item.id}</td><td class="px-2 py-1 border">${item.name}</td><td class="px-2 py-1 border text-red-600 font-bold">${item.short}</td><td class="px-2 py-1 border text-xs">${item.courses}</td></tr>`
+                );
+
+                const html5 = createTableHTML(
+                    '5. 공동교육과정 이수자 현황',
+                    ['학번', '이름', '이수 과목(학점)'],
+                    jointCourses,
+                    item => `<tr><td class="px-2 py-1 border">${item.id}</td><td class="px-2 py-1 border">${item.name}</td><td class="px-2 py-1 border">${item.courses}</td></tr>`
+                );
+
+                return `
+                    <h3 class="card-title">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        학급별 과목 선택 검증 현황
+                    </h3>
+                    ${html1}
+                    ${html2}
+                    ${html3}
+                    ${html4}
+                    ${html5}
+                `;
+            }
+
+            async function renderAiAnalysis(classStudents) {
+                const summary = await getAiAnalysis(classStudents, true); // true for summary
+                return `<h3 class="card-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                            AI 종합 분석 요약
+                        </h3>
+                        <div class="text-sm text-slate-600 mb-4 space-y-2">${summary.replace(/\n/g, '<br>')}</div>
+                        <button id="detailAiBtn" class="btn btn-secondary w-full">AI 심층 분석 및 지도 방안 전체 보기</button>`;
+            }
+            
+            // Event listener for the new detail button
+            dashboardDiv.addEventListener('click', async (e) => {
+                if (e.target.id === 'detailAiBtn') {
+                    const classCode = classCodeInput.value.trim();
+                    const classStudents = allStudentData.filter(s => String(s['학번']).startsWith(classCode));
+                    
+                    document.getElementById('aiModalTitle').textContent = `Class ${classCode}: AI 종합 분석 및 지도 방안`;
+                    aiModalContent.innerHTML = '<div class="flex justify-center items-center"><div class="loader"></div><span class="ml-2">AI 분석을 생성 중입니다...</span></div>';
+                    aiModal.classList.add('active');
+
+                    const fullAnalysis = await getAiAnalysis(classStudents, false); // false for full analysis
+                    aiModalContent.innerHTML = fullAnalysis.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong class="text-slate-800">$1</strong>');
+                }
+            });
+
+            async function getAiAnalysis(classStudents, isSummary = false) {
+                 // --- START: Netlify 환경 변수 및 서버리스 함수를 사용하도록 수정 ---
+                // 이 함수는 이제 Netlify 서버리스 함수를 호출하도록 설정되었습니다.
+                // AI 분석이 작동하려면 반드시 아래 안내에 따라 서버리스 함수를 생성하고 배포해야 합니다.
+                //
+                // --- 설정 방법 ---
+                // 1. 프로젝트 최상위 폴더에 `netlify` 폴더를 만들고, 그 안에 `functions` 폴더를 만드세요.
+                //    (프로젝트 구조: /netlify/functions/openai-proxy.js)
+                //
+                // 2. `functions` 폴더 안에 `openai-proxy.js`라는 이름의 파일을 생성하고 아래 코드를 붙여넣으세요.
+                /*
+                // 파일 경로: netlify/functions/openai-proxy.js
+
+                exports.handler = async function(event) {
+                    // POST 요청만 허용합니다.
+                    if (event.httpMethod !== 'POST') {
+                        return { statusCode: 405, body: 'Method Not Allowed' };
+                    }
+
+                    try {
+                        // 클라이언트로부터 받은 프롬프트를 파싱합니다.
+                        const { prompt } = JSON.parse(event.body);
+                        
+                        // Netlify 환경 변수에서 API 키를 가져옵니다.
+                        const apiKey = process.env.OPENAI_API_KEY;
+
+                        if (!apiKey) {
+                            throw new Error('OpenAI API 키가 환경 변수에 설정되지 않았습니다.');
+                        }
+
+                        // OpenAI API에 보낼 요청 데이터를 구성합니다.
+                        const payload = {
+                            model: "gpt-4o",
+                            messages: [{ "role": "user", "content": prompt }],
+                            temperature: 0.7
+                        };
+
+                        // OpenAI API를 호출합니다.
+                        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${apiKey}`
+                            },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) {
+                            const errorBody = await response.json();
+                            return {
+                                statusCode: response.status,
+                                body: JSON.stringify(errorBody)
+                            };
+                        }
+
+                        const data = await response.json();
+
+                        // 성공적인 응답을 클라이언트에 반환합니다.
+                        return {
+                            statusCode: 200,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        };
+
+                    } catch (error) {
+                        return {
+                            statusCode: 500,
+                            body: JSON.stringify({ message: error.message })
+                        };
+                    }
+                };
+                */
+                //
+                // 3. Netlify 프로젝트 대시보드에 로그인한 후, 아래 경로로 이동하여 환경 변수를 추가하세요.
+                //    Site settings > Build & deploy > Environment
+                //
+                // 4. 다음 정보를 입력하여 새 환경 변수를 생성합니다.
+                //    - Key: OPENAI_API_KEY
+                //    - Value: 사용자의 실제 OpenAI API 키 (sk-...)
+                //
+                // 5. 사이트를 다시 배포하면 Netlify가 함수를 자동으로 인식하고 배포합니다.
+                // --- 설정 안내 끝 ---
+
+                const classData = classStudents.map(s => ({
+                    name: s['이름'],
+                    career: s['희망진로 및 학과'] || '탐색중',
+                    subjects: getStudentCourses(s).map(c => c.subjectName)
+                }));
+                
+                let prompt;
+                if(isSummary) {
+                    prompt = `다음은 한 학급의 학생 데이터입니다: ${JSON.stringify(classData)}. 이 데이터를 바탕으로 학급 전체의 과목 선택 경향과 진로 설정 현황에 대한 지도 방안을 2-3문장으로 간결하게 요약해주세요.`;
+                } else {
+                    prompt = `당신은 대한민국 고등학교의 진로진학 전문 컨설턴트입니다. 주어진 학급 학생 데이터를 바탕으로, 담임 선생님을 위한 심층 분석 및 구체적인 지도 방안을 다음 네 가지 항목에 맞춰 상세하고 전문적으로 작성해주세요. 각 항목은 제목과 함께 명확히 구분하여 설명해주세요.
+
+1.  **데이터 기반 지도 방안**: 대시보드에서 분석된 통계(진로 설정 비율, 과목 선택 쏠림 현황 등)를 근거로 학급의 강점과 약점을 진단하고, 이에 대한 구체적인 지도 방안을 제안해주세요.
+2.  **학급/교과 활동 추천**: 학생들의 과목 선택에 실질적인 도움을 줄 수 있는 창의적 체험활동, 교과 연계 프로젝트, 또는 동아리 활동 아이디어를 구체적으로 추천해주세요.
+3.  **진로 탐색 활동**: 진로를 '탐색중'인 학생들을 위해, 자신의 흥미와 적성을 발견할 수 있는 구체적인 학급 활동(예: 선배와의 대화, 직업인 인터뷰, 포트폴리오 제작)을 추천해주세요.
+4.  **상담 질문 제안**: 학생들이 자신의 과목 선택에 대해 깊이 성찰해볼 수 있도록, 선생님이 학생과 상담 시 활용할 수 있는 구체적인 질문 목록을 3~4가지 제안해주세요.`;
+                }
+
+                try {
+                    // 이제 직접 OpenAI에 요청하는 대신, 우리가 만든 Netlify 함수에 요청을 보냅니다.
+                    const response = await fetch('/.netlify/functions/openai-proxy', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ prompt: prompt })
+                    });
+
+                    if (!response.ok) {
+                        const errorBody = await response.json();
+                        throw new Error(`API 요청 실패: ${errorBody.message || JSON.stringify(errorBody)}`);
+                    }
+                    
+                    const result = await response.json();
+                    
+                    if (result.choices && result.choices.length > 0) {
+                        return result.choices[0].message.content;
+                    } else {
+                        throw new Error("API 응답에서 분석 결과를 찾을 수 없습니다.");
+                    }
+                } catch (error) {
+                    console.error("AI Analysis Error:", error);
+                    return "AI 분석 중 오류가 발생했습니다. Netlify 함수 설정과 환경 변수를 확인해주세요.";
+                }
+                // --- END: Netlify 환경 변수 및 서버리스 함수를 사용하도록 수정 ---
+            }
+
+            // --- 신규 그래프 렌더링 함수 ---
+            function renderInquiryRatioChart(classStudents, isRender = false) {
+                 const title = `<h3 class="card-title">
+                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+                                     탐구과목 선택 비율
+                                    </h3>`;
+                if (!isRender) return title;
+
+                let socialCount = 0;
+                let scienceCount = 0;
+                classStudents.forEach(student => {
+                    const courses = getStudentCourses(student);
+                    // A student can choose both, so we count students, not subjects.
+                    const hasSocial = courses.some(c => c.subCategory === '사회');
+                    const hasScience = courses.some(c => c.subCategory === '과학');
+                    
+                    if (hasSocial) socialCount++;
+                    if (hasScience) scienceCount++;
+                });
+
+                const ctx = document.getElementById('inquiryRatioChart').getContext('2d');
+                if(charts.inquiryRatioChart) charts.inquiryRatioChart.destroy();
+                charts.inquiryRatioChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['사회탐구 선택 학생', '과학탐구 선택 학생'],
+                        datasets: [{
+                            label: '학생 수',
+                            data: [socialCount, scienceCount],
+                            backgroundColor: ['rgba(251, 146, 60, 0.6)', 'rgba(59, 130, 246, 0.6)'],
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        onHover: (event, chartElement, chart) => {
+                            if (chartElement.length) {
+                                const index = chartElement[0].index;
+                                const data = chart.data.datasets[0].data;
+                                const total = classStudents.length; // Base percentage on total students
+                                const percentage = total > 0 ? ((data[index] / total) * 100) : 0;
+                                chart.options.plugins.centerText.text = percentage;
+                            } else {
+                                chart.options.plugins.centerText.text = '';
+                                chart.options.plugins.centerText.currentValue = 0;
+                            }
+                        },
+                        plugins: {
+                            datalabels: {
+                                display: false,
+                            },
+                            centerText: {
+                                display: true,
+                                text: '',
+                                currentValue: 0
+                            }
+                        }
+                    }
+                });
+            }
+
+            function renderLanguageChart(classStudents, isRender = false) {
+                const title = `<h3 class="card-title">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10-5-10M17 3l-5 10 5 10" /></svg>
+                                    제2외국어 선택 비율
+                                   </h3>`;
+                if (!isRender) return title;
+                
+                const langCounts = { '일본어': 0, '중국어': 0, '한문': 0 };
+                classStudents.forEach(student => {
+                    getStudentCourses(student).forEach(course => {
+                        if(langCounts[course.subjectName] !== undefined) {
+                            langCounts[course.subjectName]++;
+                        }
+                    });
+                });
+
+                const ctx = document.getElementById('languageChart').getContext('2d');
+                if(charts.languageChart) charts.languageChart.destroy();
+                charts.languageChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(langCounts),
+                        datasets: [{
+                            label: '학생 수',
+                            data: Object.values(langCounts),
+                            backgroundColor: ['rgba(239, 68, 68, 0.6)', 'rgba(251, 191, 36, 0.6)', 'rgba(16, 185, 129, 0.6)'],
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        onHover: (event, chartElement, chart) => {
+                            if (chartElement.length) {
+                                const index = chartElement[0].index;
+                                const data = chart.data.datasets[0].data;
+                                const total = data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? ((data[index] / total) * 100) : 0;
+                                chart.options.plugins.centerText.text = percentage;
+                            } else {
+                                chart.options.plugins.centerText.text = '';
+                                chart.options.plugins.centerText.currentValue = 0;
+                            }
+                        },
+                        plugins: {
+                            datalabels: {
+                                display: false,
+                            },
+                            centerText: {
+                                display: true,
+                                text: '',
+                                currentValue: 0
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
+
+
